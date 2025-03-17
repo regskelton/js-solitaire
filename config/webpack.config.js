@@ -11,21 +11,28 @@ const config = env === 'development'
 const { inject } = config;
 
 const plugins = [
-    new CopyWebpackPlugin([{
-        from: '**/*',
-        transform: (content, path) => {
-            let changed = content.toString();
-            for (const key in inject) {
-                changed = changed.replace(`%${key}%`, inject[key]);
-            }
-            return changed;
-        }
-    }], {
-        ignore: ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.js', '*.ico', '*.scss']
+
+    new CopyWebpackPlugin({
+        patterns: [
+            { from: '**/*', transform: (content, path) =>
+                {
+                    let changed = content.toString();
+                    for (const key in inject) {
+                        changed = changed.replace(`%${key}%`, inject[key]);
+                    }
+                    return changed;
+                },
+              globOptions: {
+                    ignore: ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.js', '*.ico', '*.scss'] }
+                }
+        ],
     }),
-    new CopyWebpackPlugin([{
-        from: '**/*.{png,jpg,jpeg,gif,ico}',
-    }])
+    new CopyWebpackPlugin({
+        patterns: [{
+            from: '**/*.{png,jpg,jpeg,gif,ico}',
+            noErrorOnMissing: true
+        }]
+    })
 ];
 
 if (env === 'production') {
@@ -35,11 +42,6 @@ if (env === 'production') {
                 NODE_ENV: JSON.stringify('production')
             }
         }),
-        new UglifyPlugin({
-            output: {
-                comments: false
-            }
-        })
     );
 } else {
     plugins.push(
@@ -72,19 +74,15 @@ module.exports = {
             ],
             loader: require.resolve('file-loader'),
             options: {
-                name: 'static/media/[name].[hash:8].[ext]'
+                //name: 'static/media/[name].[hash:8].[ext]'
             }
         }, {
             test: /\.js$/,
             include: paths.src,
-            loader: require.resolve('babel-loader'),
+            loader: 'babel-loader',
 
             options: {
-                presets: [['env', {
-                    targets: {
-                        uglify: true
-                    }
-                }]],
+                presets: ['@babel/preset-env'],
                 cacheDirectory: true
             }
         }, {
@@ -96,31 +94,36 @@ module.exports = {
                     options: {
                         modules: false,
                         sourceMap: false,
-                        localIdentName: env === 'development' ? '[local]' : '[hash:base64:5]'
+                        //localIdentName: env === 'development' ? '[local]' : '[hash:base64:5]'
                     }
                 },
                 {
                     loader: require.resolve('postcss-loader'),
                     options: {
-                        // Necessary for external CSS imports to work
-                        // https://github.com/facebookincubator/create-react-app/issues/2677
-                        ident: 'postcss',
-                        plugins: () => [
-                            require('cssnano'),
-                            require('postcss-flexbugs-fixes'),
-                            autoprefixer({
-                                browsers: [
-                                    '>1%',
-                                    'last 4 versions',
-                                    'Firefox ESR',
-                                    'not ie < 9' // React doesn't support IE8 anyway
-                                ],
-                                flexbox: 'no-2009'
-                            })
-                        ]
+                        postcssOptions: {
+                            // Necessary for external CSS imports to work
+                            // https://github.com/facebookincubator/create-react-app/issues/2677
+                            //ident: 'postcss',
+                            plugins: () => [
+                                require('cssnano'),
+                                require('postcss-flexbugs-fixes'),
+                                autoprefixer({
+                                    browsers: [
+                                        '>1%',
+                                        'last 4 versions',
+                                        'Firefox ESR',
+                                        'not ie < 9' // React doesn't support IE8 anyway
+                                    ],
+                                    flexbox: 'no-2009'
+                                })
+                            ]
+                        }
                     }
                 }, {
-                    loader: require.resolve('sass-loader'),
+                    loader: "sass-loader",
+                    options: {
+                        implementation: require("sass"),
+                    },
                 }
             ]
         }]
@@ -128,11 +131,14 @@ module.exports = {
     plugins: plugins,
     // Some libraries import Node modules but don't use them in the browser.
     // Tell Webpack to provide empty mocks for them so importing them works.
-    node: {
-        dgram: 'empty',
-        fs: 'empty',
-        net: 'empty',
-        tls: 'empty'
+    resolve: {
+        fallback: {
+            dgram: false,
+            fs: false,
+            net: false,
+            tls: false,
+            child_process: false
+        }
     },
     // Turn off performance hints during development because we don't do any
     // splitting or minification in interest of speed. These warnings become
